@@ -1,0 +1,1060 @@
+---
+title: "Final code for the reanalysis of the partially processed OTU table produced from 16S rRNA amplicon sequencing data in a study by Weingarden et al"
+#Details of this study and data available to download can be found via this link: https://qiita.ucsd.edu/study/description/1924
+
+output:
+  pdf_document: default
+  html_document: default
+date: "2026-06-16"
+---
+
+
+```{r}
+#new code for installing biom, with taxonomy
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("phyloseq")
+
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+
+otu1 <- import_biom("C:/Users/daisy/OneDrive - University of Warwick/BS341 research project/Analysis/Weingarden data inc BIOM/processed_data/142_otu_table.biom", 
+                    parseFunction = parse_taxonomy_greengenes)
+
+#importing metadata 
+
+meta <- read.delim("C:/Users/daisy/OneDrive - University of Warwick/BS341 research project/Analysis/Weingarden data inc BIOM/1924_20230201-070324 (1).txt", 
+                   row.names = 1, sep = "\t", check.names = FALSE)
+
+
+```
+
+
+```{r}
+
+install.packages("meta")
+
+```
+```{r,echo=FALSE}
+
+library(phyloseq)
+library(biomformat)
+library(meta)
+library(vegan)
+
+```
+```{r}
+#add the metadata to the sample data
+
+sample_data(otu1) <- sample_data(meta)
+
+
+```
+
+
+
+
+
+
+
+
+#rarefaction curves
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#plotting a rarefaction curve to justify subsampling size - tutorial found 20/05/2026 in project diary
+
+#note: the initial code is for taking the otu out of the phyloseq object so vegan can compute it. It is a method taken from tutorial on 05/06/2026 in project diary
+
+library(vegan)
+
+ otu1_veg_format <- function(physeq) {
+  OTU <- otu_table(physeq)
+  if (taxa_are_rows(OTU)) {
+    OTU <- t(OTU)
+  }
+  return(as(OTU, "matrix"))
+}
+
+#this step plugs otu1 into above:
+
+otu_matrix <- otu1_veg_format(otu1)
+  
+#making the rarefication curve
+
+rarecurve(otu_matrix, step = 20, cex = 0.5, label=FALSE)
+
+abline(v=5000, col = "green", lty =1 )
+
+
+```
+
+
+```{r}
+#a curve with rarefied data for comparison
+
+library(vegan)
+library(phyloseq)
+
+rarefied_otu1 = rarefy_even_depth(otu1, rngseed=1, sample.size= 5000, replace=F)
+
+ rare_otu1_veg_format <- function(physeq) {
+  OTU <- otu_table(physeq)
+  if (taxa_are_rows(OTU)) {
+    OTU <- t(OTU)
+  }
+  return(as(OTU, "matrix"))
+}
+
+#this step plugs otu1 into above:
+
+otu_matrix <- rare_otu1_veg_format(rarefied_otu1)
+  
+#making the rarefication curve
+
+rarecurve(otu_matrix, step = 5, cex = 0.5, label=FALSE)
+
+abline(v=5000, col = "green", lty =1 )
+
+```
+
+
+```{r}
+
+#plotting a curve to show the sequencing depths below 5000
+
+pruned_depth_5000 <- prune_samples(sample_sums(otu1) < 5000, otu1)
+
+library(vegan)
+
+ otu1_veg_format <- function(physeq) {
+  OTU <- otu_table(physeq)
+  if (taxa_are_rows(OTU)) {
+    OTU <- t(OTU)
+  }
+  return(as(OTU, "matrix"))
+ }
+ 
+ pruned_5000_mat <- otu1_veg_format(pruned_depth_5000)
+ 
+ rarecurve(pruned_5000_mat, step = 5, cex = 0.5, label= FALSE)
+
+```
+
+
+```{r}
+
+#rarefying data that is only from the participants given FMT (the additional 10 patients do not have a day but are called "pre-FMT"). This object is assigned the name numeric-subjects and can be used if needed in the next analyses.
+
+library(phyloseq)
+
+numeric_subjects <- subset_samples(otu1, day_relative_to_fmt != "pre-FMT")
+ 
+rare_numeric_subjects = rarefy_even_depth(numeric_subjects, rngseed=1, sample.size= 5000, replace=F)
+
+```
+
+
+
+
+
+
+
+
+#alpha diversity
+
+
+
+
+
+
+
+
+```{r}
+
+#installing the package "phylosmith"
+
+install.packages("remotes")
+remotes::install_github("schuyler-smith/phylosmith")
+library(phylosmith)
+```
+
+```{r}
+#rarefied data of all samples input to a basic shannon diversity plot comparing alpha diversity 
+
+
+set.seed(1)
+rare_otu1_shan = rarefy_even_depth(otu1, rngseed=1, sample.size= 5000, replace=F)
+
+alpha_diversity_graph(rare_otu1_shan, treatment = "disease_state", subset = NULL,
+index = "shannon", colors = "default")
+```
+
+```{r}
+#rarefied data of all samples input to a basic invsimpson diversity plot comparing alpha diversity 
+
+#graph function
+  
+set.seed(1)
+rare_otu1_simp = rarefy_even_depth(otu1, rngseed=1, sample.size= 5000, replace=F)
+
+alpha_diversity_graph(rare_otu1_simp, treatment = "disease_state", subset = NULL,
+index = "invsimpson", colors = "default")
+```
+
+```{r}
+
+
+#rarefied data of only recients and donor (numeric_subjects) samples input to a basic shannon diversity plot comparing alpha diversity 
+
+library(phylosmith)
+
+numeric_subjects <- subset_samples(otu1, day_relative_to_fmt != "pre-FMT")
+  
+set.seed(1)
+rare_numeric_subjects = rarefy_even_depth(numeric_subjects, rngseed=1, sample.size= 5000, replace=F)
+
+
+alpha_diversity_graph(rare_numeric_subjects, treatment = "disease_state", subset = NULL,
+index = "shannon", colors = "default")
+
+
+```
+
+```{r}
+library(phylosmith)
+
+#rarefied data of only recients and donor (numeric_subjects) samples input to a basic invsimpson diversity plot comparing alpha diversity 
+
+library(phylosmith)
+
+alpha_diversity_graph(rare_numeric_subjects, treatment = "disease_state", subset = NULL,
+index = "invsimpson", colors = "default")
+
+
+```
+
+```{r}
+#A shannon graph that looks at only the rarefied post FMT samples and puts days along the x axis, generating a boxplot for each day. 
+
+#rarefaction necessary.
+
+library(phylosmith)
+library(phyloseq)
+
+
+shan_postFMT <- subset_samples(otu1, disease_state == "post-FMT")
+shan_post_rarefied_otu1 <- rarefy_even_depth(shan_postFMT, rngseed=1, sample.size= 5000, replace=F) 
+
+alpha_diversity_graph(shan_post_rarefied_otu1, 
+                      treatment = "day_relative_to_fmt", 
+                      subset = list(day_relative_to_fmt = "1", "10", "20", "30", "40"),
+                      index = "shannon", 
+                      colors = "default")
+
+```
+
+
+
+
+
+
+
+
+
+#beta diversity
+- code for this way heavily inspired by code available to download from thsi tutorial https://micca.readthedocs.io/en/latest/phyloseq.html
+
+
+
+
+
+
+
+
+
+```{r}
+
+#ordination plot - unrarefied, all samples 
+
+library(phyloseq)
+library(vegan)
+
+
+bray_diss = phyloseq::distance(otu1, method="bray")
+ordination = ordinate(otu1, method="PCoA", distance=bray_diss)
+plot_ordination(otu1, ordination, color="disease_state") + theme(aspect.ratio=1)
+
+
+
+
+```
+
+```{r}
+# rarefied, all samples
+
+library(phyloseq)
+library(vegan)
+
+set.seed(1)
+rarefied_otu1 = rarefy_even_depth(otu1, rngseed=1, sample.size= 5000, replace=F)
+
+bray_diss = phyloseq::distance(rarefied_otu1, method="bray")
+ordination = ordinate(rarefied_otu1, method="PCoA", distance=bray_diss)
+plot_ordination(rarefied_otu1, ordination, color="disease_state") + theme(aspect.ratio=1)
+
+
+```
+
+```{r}
+
+#unrarefied, all samples, pruned to over 5000 (same as over 100)
+
+
+library(phyloseq)
+library(vegan)
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+bray_diss = phyloseq::distance(filt_100_otu, method="bray")
+ordination = ordinate(filt_100_otu, method="PCoA", distance=bray_diss)
+plot_ordination(filt_100_otu, ordination, color="disease_state") + theme(aspect.ratio=1)
+
+
+
+```
+
+
+```{r}
+#unrarefied, only numeric_subjects 
+
+library(phyloseq)
+library(vegan)
+
+numeric_subjects <- subset_samples(otu1, day_relative_to_fmt != "pre-FMT")
+
+bray_diss = phyloseq::distance(numeric_subjects, method="bray")
+ordination = ordinate(numeric_subjects, method="PCoA", distance=bray_diss)
+plot_ordination(numeric_subjects, ordination, color="disease_state") + theme(aspect.ratio=1)
+
+
+```
+
+```{r}
+
+#rarefied, only numeric_subjects
+
+library(phyloseq)
+library(vegan)
+
+set.seed(1)
+rare_numeric_subjects = rarefy_even_depth(numeric_subjects, rngseed=1, sample.size= 5000, replace=F)
+
+bray_diss = phyloseq::distance(rare_numeric_subjects, method="bray")
+ordination = ordinate(rare_numeric_subjects, method="PCoA", distance=bray_diss)
+plot_ordination(rare_numeric_subjects, ordination, color="disease_state") + theme(aspect.ratio=1)
+
+
+```
+
+```{r}
+
+#unrarefied, only numeric_subjects, pruned > 5000
+
+library(phyloseq)
+library(vegan)
+
+numeric_subjects <- subset_samples(otu1, day_relative_to_fmt != "pre-FMT")
+
+filt_100_num_otu <- prune_samples(sample_sums(numeric_subjects) >= 100, numeric_subjects)
+
+bray_diss = phyloseq::distance(filt_100_num_otu, method="bray")
+ordination = ordinate(filt_100_num_otu, method="PCoA", distance=bray_diss)
+plot_ordination(filt_100_num_otu, ordination, color="disease_state") + theme(aspect.ratio=1)
+
+
+
+
+```
+
+
+
+
+
+
+#abundance heatmaps (community changes)
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+#CD1-4 + donor pre-FMT
+
+library(phylosmith)
+library(ggplot2)
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+CD1to14 <- subset_samples(filt_100_otu, host_subject_id %in% c("Donor", "CD1", "CD2", "CD3", "CD4", "CD5", "CD6", "CD7", "CD8", "CD9", "CD10", "CD11", "CD12","CD13", "CD14"))
+CD1to14preFMT <- subset_samples(CD1to14, disease_state == "Pre-FMT" | disease_state == "healthy")
+                               
+
+#making the heatmap (phylosmith function)
+
+abundance_heatmap(CD1to14preFMT, classification = "Phylum", 
+  treatment = "host_subject_id", subset = NULL, transformation = "log", 
+  colors = 'default', treatment_labels = NULL, sample_labels = NULL,
+  classification_labels= NULL)
+
+
+```
+
+
+
+```{r}
+
+#CD1-4 + donor post-FMT
+
+library(phylosmith)
+library(ggplot2)
+
+#filtering step
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+CD1234 <- subset_samples(filt_100_otu, host_subject_id %in% c("Donor", "CD1", "CD2", "CD3", "CD4"))
+
+CD1234postFMT <- subset_samples(CD1234, disease_state == "post-FMT" | disease_state == "healthy")
+                               
+
+#making the heatmap (phylosmith function)
+
+abundance_heatmap(CD1234postFMT, classification = "Phylum", 
+  treatment = "host_subject_id", subset = NULL, transformation = "log", 
+  colors = 'default', treatment_labels = NULL, sample_labels = NULL,
+  classification_labels= NULL)
+
+```
+
+
+
+
+```{r}
+#seeing if i can isolate the initial days and look at the effect of taxa like Proteobacteria + filtering
+
+#not used in final figures
+
+library(phylosmith)
+library(phyloseq)
+library(ggplot2)
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+initial_post <- subset_samples(filt_100_otu, 
+                             day_relative_to_fmt %in% c("1","2","3","4","5"))
+
+initial_post_proteobac <- subset_taxa(initial_post, Phylum == "Proteobacteria")
+
+samples_before <- subset_samples(filt_100_otu, disease_state == "Pre-FMT")
+
+samples_before_proteobac <- subset_taxa(samples_before, Phylum == "Proteobacteria")
+
+merged1 <- merge_phyloseq(initial_post_proteobac, samples_before_proteobac)
+
+abundance_heatmap(merged1, classification = "Phylum", 
+  treatment =  "day_relative_to_fmt", subset = NULL, transformation = 'log', 
+  colors = 'default', treatment_labels = NULL, sample_labels = NULL,
+  classification_labels= NULL)
+```
+
+
+
+
+```{r}
+#trying to see if i can see the species in the clostridium present, extending the days and merging with healthy to see if there are more conclusive results
+
+#not used in final figures
+
+library(phylosmith)
+library(phyloseq)
+library(ggplot2)
+
+initial_post <- subset_samples(otu1, 
+                             day_relative_to_fmt %in% c("1","2","3","4","5", "6", "8"))
+initial_post_clostridium <- subset_taxa(initial_post, Genus == "Clostridium")
+
+samples_before <- subset_samples(otu1, disease_state == "Pre-FMT")
+samples_before_clostridium <- subset_taxa(samples_before, Genus == "Clostridium")
+healthy_samples <- subset_samples(otu1, disease_state == "healthy")
+
+merged1 <- merge_phyloseq(initial_post_clostridia, samples_before_clostridium)
+merged2 <- merge_phyloseq(merged1, healthy_samples)
+
+abundance_heatmap(merged2, classification = "Species", 
+  treatment =  "disease_state", subset = NULL, transformation = 'log', 
+  colors = 'default', treatment_labels = NULL, sample_labels = NULL,
+  classification_labels= NULL)
+
+
+```
+
+
+```{r}
+
+#looking at what the names of the ids are that are 0 (after looking at taxa of samples that are only day_relative_to_FMT = 0 on the heatmap )
+sample_data(otu1)["1924.Sadowsky.22r", "disease_state"]
+```
+
+
+
+
+
+
+
+
+
+
+
+#investigating abundance at a taxa level
+
+
+
+
+
+#1 absolute abundance (not included in report)
+
+
+```{r}
+
+#plotting a bar chart of unfiltered absolute abundance of Cdiff all samples
+
+
+ diff_only <- subset_taxa(otu1, Species == "difficile")
+
+
+#making sure to get rid of the x axis labels
+
+
+plot_bar(diff_only, fill = "Species") +
+  facet_grid(~host_subject_id, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank(), strip.text = element_text(size = 4)) +
+          
+  labs(title = "C. difficile abundance", y = "Abundance") 
+         
+  
+ 
+```
+```{r}
+#plotting absolute abundance of unfiltered Cdiff all samples - sorted by host_subject_id, filtered >100 reads. CD1-4+donor only
+
+#getting only the CD1-4 and donor out of otu1
+
+recipients <- subset_samples(otu1, host_subject_id %in% c("CD1", "CD2", "CD3", "CD4", "Donor"))
+
+
+ CD1234don_diff_only <- subset_taxa(recipients, Species == "difficile")
+
+
+#making sure to get rid of the x axis labels
+
+
+plot_bar(CD1234don_diff_only, fill = "Species") +
+  facet_grid(~host_subject_id, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank(), strip.text = element_text(size = 8)) +
+          
+  labs(title = "C. difficile abundance", y = "Abundance") 
+         
+ 
+```
+
+
+```{r}
+#plotting absolute abundance but RAREFIED first 
+
+#note: i just called it rarefied_otu_2 because filtered_otu had already been run near the top and if something changes, i dodn't want to confuse the definition of filtered_otu.
+
+library(phyloseq)
+rarefied_otu_2 = rarefy_even_depth(otu1, rngseed=1, sample.size= 5000, replace=F)
+
+ rare_diff_only <- subset_taxa(rarefied_otu_2, Species == "difficile")
+
+plot_bar(diff_only, fill = "Species") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "C. difficile abundance", y = "Abundance") 
+         
+```
+```{r}
+#plotting a bar chart of FILTERED by pruning <100 reads (but not rarefied) absolute abundance of Cdiff
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+ filt_diff_only <- subset_taxa(filt_100_otu, Species == "difficile")
+
+
+#making sure to get rid of the x axis labels
+
+
+plot_bar(filt_diff_only, fill = "Species") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "C. difficile abundance", y = "Abundance") 
+         
+  
+ 
+```
+
+```{r}
+#plotting a bar chart of filtered by pruning <100 reads and FMT donor/recipient only of absolute abundance of Cdiff
+
+numeric_subjects <- subset_samples(otu1, day_relative_to_fmt != "pre-FMT")
+
+filt_100_num_otu <- prune_samples(sample_sums(numeric_subjects) >= 100, numeric_subjects)
+
+ filt_num_diff_only <- subset_taxa(filt_100_num_otu, Species == "difficile")
+
+
+#making sure to get rid of the x axis labels
+
+
+plot_bar(filt_num_diff_only, fill = "Species") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank(), strip.text = element_text(size = 4)) +
+          
+  labs(title = "C. difficile abundance", y = "Abundance") 
+  
+ 
+```
+
+
+
+
+
+
+
+
+#2 relative abundance (individual taxa)
+ 
+ 
+ 
+```{r}
+
+#FILTERED RELATIVE abundance of Cdiff - sorted by host_subject_id, filtered >100 reads. CD1-4+donor only
+
+#getting only the CD1-4 and donor out of otu1
+library(microbiome)
+library(phyloseq)
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+recipients <- subset_samples(filt_relative_otu1, host_subject_id %in% c("CD1", "CD2", "CD3", "CD4", "Donor"))
+
+
+ relative_CD1234don_diff_only <- subset_taxa(recipients, Species == "difficile")
+ 
+
+
+#making sure to get rid of the x axis labels
+
+
+plot_bar(relative_CD1234don_diff_only, fill = "Species") +
+  facet_grid(~host_subject_id, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank(), strip.text = element_text(size = 8)) +
+          
+  labs(title = "C. difficile relative abundance", y = "Relative abundance") 
+         
+ 
+```
+
+```{r}
+#plotting a bar chart of FILTERED RELATIVE abundance of Cdiff
+
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+ filt_diff_only <- subset_taxa(filt_relative_otu1, Species == "difficile")
+
+
+#making sure to get rid of the x axis labels
+
+
+plot_bar(filt_diff_only, fill = "Species") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "C. difficile relative abundance", y = "Relative abundance") 
+         
+ 
+```
+
+```{r}
+#plotting a bar chart of FILTERED RELATIVE abundance of Proteobacteria
+
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+ filt_diff_only <- subset_taxa(filt_relative_otu1, Phylum == "Proteobacteria")
+
+
+
+plot_bar(filt_diff_only, fill = "Phylum") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "Proteobacteria relative abundance", y = "Relative abundance") 
+         
+ 
+```
+```{r}
+#plotting a bar chart of FILTERED RELATIVE abundance of Proteobacteria
+
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+ filt_diff_only <- subset_taxa(filt_relative_otu1, Order == "Enterobacteriales")
+
+
+
+plot_bar(filt_diff_only, fill = "Order") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "Enterobacteriales relative abundance", y = "Relative abundance") 
+         
+ 
+```
+
+
+```{r}
+#plotting a bar chart of FILTERED RELATIVE abundance of Clostridium 
+
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+ filt_diff_only <- subset_taxa(filt_relative_otu1, Genus == "Clostridium")
+
+
+
+plot_bar(filt_diff_only, fill = "Genus") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "Clostridium relative abundance", y = "Relative abundance") 
+         
+ 
+```
+
+```{r}
+#plotting a bar chart of FILTERED RELATIVE abundance of Clostridium 
+
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+ filt_diff_only <- subset_taxa(filt_relative_otu1, Genus == "Bifidobacterium")
+
+
+plot_bar(filt_diff_only, fill = "Genus") +
+  facet_grid(~disease_state, scales = "free_x", space = "free_x") +
+  theme(axis.text.x = element_blank()) +
+          
+  labs(title = "Bifidobacterium relative abundance", y = "Relative abundance") 
+         
+ 
+```
+
+
+
+
+
+
+
+
+#relative abundance barplots (didn't use in report)
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+#relative abundance barplot all samples
+
+library(microbiome)
+library(phyloseq)
+
+#relative abundance after filtering very low (not rarefied)
+
+filt_100_otu <- prune_samples(sample_sums(otu1) >= 100, otu1)
+
+filt_relative_otu1 <- transform(filt_100_otu, "compositional")
+
+
+
+ plot_bar(filt_relative_otu1, fill="Phylum") + facet_wrap(~disease_state, scales="free_x", nrow=1)
+ 
+```
+```{r}
+#relative abundance barplot only pre-FMT and healthy 
+
+library(microbiome)
+library(phyloseq)
+
+#relative abundance after filtering very low (not rarefied)
+
+pre_and_healthy <- subset_samples(otu1, day_relative_to_fmt != "post-FMT")
+
+filt_100_otu_pre_health <- prune_samples(sample_sums(pre_and_healthy) >= 100, pre_and_healthy)
+
+filt_relative_otu_pre <- transform(filt_100_otu_pre_health, "compositional")
+
+
+
+
+
+ plot_bar(filt_relative_otu_pre, fill="Phylum") + facet_wrap(~disease_state, scales="free_x", nrow=1)
+ 
+```
+
+
+```{r}
+
+
+library(microbiome)
+library(phyloseq)
+
+#relative abundance of only participants involved after filtering very low (not rarefied)
+
+filt_100_num_otu <- prune_samples(sample_sums(numeric_subjects) >= 100, numeric_subjects)
+
+filt_relative_num_otu1 <- transform(filt_100_num_otu, "compositional")
+
+
+
+ plot_bar(filt_relative_num_otu1, fill="Phylum") + facet_wrap(~disease_state, scales="free_x", nrow=1)
+ 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#supplemetary tables
+
+
+
+
+```{r}
+
+#supporting the rarefaction curve figure
+
+#is there a disproportionate amount removed from certain recipients after rarefication? 
+
+#host id to read length in a table (cap at bottom ten maybe). Data frame explanation on 05/06/2026 helped
+library(phyloseq)
+library(knitr)
+
+CD_reads <- data.frame (
+    id = sample_data(otu1)$anonymized_name,
+    origin = sample_data(otu1)$host_subject_id,
+    depth = sample_sums(otu1),
+    stage = sample_data(otu1)$disease_state
+)
+below_6000 <- CD_reads[CD_reads$depth <6000,]
+sorted_below_6000 <- below_6000[order(below_6000$depth),]
+
+#a table displaying the reads below and around 5000, capped at below 6000 (knitr is for knitting)
+
+knitr::kable(sorted_below_6000)
+
+
+```
+
+
+
+```{r}
+
+#how many samples present in each after filtering all data to >100 reads (same as filtering to over 5000)
+
+table(sample_data(filt_100_otu)$disease_state)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+#other checks and inspections of the data
+
+
+
+
+
+```{r}
+ 
+#having a quick look at what days the healthy values are assigned 04/06/2026
+
+healthy_values <- subset_samples(otu1, disease_state == "healthy")
+table(sample_data(healthy_values)$day_relative_to_fmt)
+
+```
+
+```{r}
+#checking the size of the metadata
+dim(meta)
+
+#checking if the columns in the biom data match up with the metadata so that the biom OTU can be merged with the metadata bc the otu is 9 longer than the metadata
+
+all(sample_names(otu1) %in% rownames(meta))
+
+```
+
+```{r}
+
+#what are the metadata category names?
+
+sample_variables(otu1)
+```
+
+```{r}
+
+#where are the remaining 3 Pre-FMT values in the day_relative_to_FMT data? Are they hidden in 0? 
+
+subset(as.data.frame(sample_data(otu1)), day_relative_to_fmt %in% c("0"))$disease_state
+
+#Answer is yes
+
+```
+
+```{r}
+
+#this is how i check which days samples were actually taken and and called 'post-FMT' in the data 
+
+pre_fmt <- subset_samples(otu1, disease_state == "post-FMT")
+days <- sort(sample_data(pre_fmt)$day_relative_to_fmt)
+
+table(days)
+
+```
+
+```{r}
+
+#data frame help to interpret abundance plots
+
+match_id_to_participant <- data.frame (
+    anon_id = sample_data(otu1)$anonymized_name,
+    participant = sample_data(otu1)$host_subject_id,
+    stage = sample_data(otu1)$disease_state,
+    day = sample_data(otu1)$day_relative_to_fmt
+)
+
+print(match_id_to_participant)
+
+colnames(sample_data(otu1))
+```
+
+```{r}
+#making a table of cdiff reads and id to see if i can match up where the post-CDI higher reads are on the abundance plots
+
+library(phyloseq)
+
+#diff object (not filtered)
+diff_only <- subset_taxa(otu1, Species == "difficile")
+cdifftable <- otu_table(diff_only)
+
+cdifftable
+
+```
+
+```{r}
+
+#looking at the cdiff reads only from post FMT in unrarefied data, sorted from largest to smallest
+# could be supplementary data for figure 5
+
+library(phyloseq)
+
+#diff object (not filtered)
+diff_only <- subset_taxa(otu1, Species == "difficile")
+
+postFMT_diff_only <- subset_samples(diff_only, disease_state == "post-FMT")
+cdifftable <- as.numeric(otu_table(postFMT_diff_only))
+sorted_cdifftable <- sort(cdifftable, decreasing=TRUE)
+
+
+```
+
+```{r}
+
+#looking at the cdiff reads only from post FMT in rarefied data
+
+library(phyloseq)
+
+rarefied_otu_2 = rarefy_even_depth(otu1, rngseed=1, sample.size= 5000, replace=F)
+f_diff_only <- subset_taxa(rarefied_otu_2, Species == "difficile")
+
+f_postFMT_diff_only <- subset_samples(f_diff_only, disease_state == "post-FMT")
+f_cdifftable <- as.numeric(otu_table(f_postFMT_diff_only))
+sorted_rarefied_cdifftable <- sort(f_cdifftable, decreasing=TRUE)
+
+sorted_rarefied_cdifftable
+
+```
+
+
+
